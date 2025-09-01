@@ -1,5 +1,4 @@
 // src/services/AIService.ts
-
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -25,7 +24,7 @@ export class AIService {
     image: "google/gemini-2.5-flash-image-preview:free"
   };
 
-  // Enhanced local spell checker
+  // Local spell checker fallback
   private enhancedSpellCheck(text: string): string {
     if (!text) return "";
     const corrections: Record<string, string> = {
@@ -45,13 +44,11 @@ export class AIService {
       'truely': 'truly', 'untill': 'until', 'usefull': 'useful', 'wierd': 'weird',
       'writting': 'writing'
     };
-
     let corrected = text;
     Object.entries(corrections).forEach(([wrong, right]) => {
       const regex = new RegExp(`\\b${wrong}\\b`, 'gi');
       corrected = corrected.replace(regex, right);
     });
-
     corrected = corrected.replace(/\bi\b/g, 'I');
     corrected = corrected.replace(/(^|[.!?]\s+)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
     if (corrected && !/[.!?]$/.test(corrected.trim())) corrected += ".";
@@ -63,7 +60,7 @@ export class AIService {
     return this.models[serviceType as keyof typeof this.models] || this.models.auto;
   }
 
-  // Main function to send messages
+  // Send message to OpenRouter AI
   async sendMessage(messages: AIMessage[], serviceType: string = 'auto'): Promise<AIResponse> {
     try {
       const lastMessage = messages[messages.length - 1];
@@ -71,20 +68,19 @@ export class AIService {
       const isImageGeneration = /generate.*image|create.*image|make.*image|draw|picture|photo/i.test(lastMessage.content);
       const selectedModel = this.getModel(serviceType, hasImage);
 
-      // Pollinations fallback for image generation
+      // Image generation fallback
       if (isImageGeneration && !hasImage) {
         const prompt = lastMessage.content.replace(/generate|create|make|draw/gi, '').trim();
         const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&seed=${Date.now()}&enhance=true`;
         return {
-          content: `I've generated an image for: "${prompt}". Here's your AI-generated image!`,
+          content: `I've generated an image for: "${prompt}". Here's your custom AI-generated image!`,
           model: 'Pollinations AI',
           imageUrl
         };
       }
 
-      // Prepare API messages
       const apiMessages = [
-        { role: 'system', content: "You are PandaNexus, an advanced AI assistant created by Shakeel. Provide accurate, helpful, and friendly responses." },
+        { role: 'system', content: "You are PandaNexus, an advanced AI assistant created by Shakeel. Provide accurate and helpful responses." },
         ...messages.slice(-5).map(msg => ({
           role: msg.role,
           content: msg.image ? [
@@ -94,7 +90,6 @@ export class AIService {
         }))
       ];
 
-      // Fetch OpenRouter API
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -131,14 +126,39 @@ export class AIService {
     }
   }
 
-  // Spell check helper
+  // Spell check using OpenRouter AI as backup
   async spellCheck(text: string): Promise<string> {
     try {
-      const corrected = this.enhancedSpellCheck(text);
-      return corrected !== text ? corrected : text;
+      const localCorrection = this.enhancedSpellCheck(text);
+      if (localCorrection !== text) return localCorrection;
+
+      // API spell check
+      const apiResponse = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://pandanexus.dev',
+          'X-Title': 'PandaNexus Spell Checker'
+        },
+        body: JSON.stringify({
+          model: this.models.general,
+          messages: [
+            { role: 'system', content: 'Correct spelling, grammar, and punctuation. Return ONLY the corrected text.' },
+            { role: 'user', content: text }
+          ],
+          temperature: 0.1,
+          max_tokens: 500
+        })
+      });
+
+      if (!apiResponse.ok) throw new Error(`Spell check API failed: ${apiResponse.status}`);
+      const data = await apiResponse.json();
+      return data.choices?.[0]?.message?.content || localCorrection;
+
     } catch (error) {
       console.error("Spell check error:", error);
-      return text;
+      return this.enhancedSpellCheck(text);
     }
   }
 }
