@@ -1,37 +1,31 @@
-// AIService.ts
-import OpenAI from "openai";
+// src/services/AIService.ts
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
-  image?: string;
+  image?: string; // optional uploaded image URL
 }
 
 export interface AIResponse {
   content: string;
   model: string;
-  imageUrl?: string;
+  imageUrl?: string; // generated image URL
 }
 
 export class AIService {
-  private client: OpenAI;
+  private apiKey = "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";
+  private baseUrl = "https://openrouter.ai/api/v1";
 
   private models = {
-    auto: "deepseek/deepseek-chat-v3.1:free",
+    auto: "meta-llama/llama-3.2-3b-instruct:free",
     code: "qwen/qwen3-coder:free",
-    creative: "mistralai/mistral-nemo:free",
+    creative: "deepseek/deepseek-chat-v3.1:free",
     knowledge: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
-    general: "deepseek/deepseek-chat-v3.1:free",
+    general: "mistralai/mistral-nemo:free",
     image: "google/gemini-2.5-flash-image-preview:free"
   };
 
-  constructor(apiKey: string) {
-    this.client = new OpenAI({
-      apiKey,
-      baseURL: "https://openrouter.ai/api/v1"
-    });
-  }
-
+  // Enhanced local spell checker
   private enhancedSpellCheck(text: string): string {
     if (!text) return "";
     const corrections: Record<string, string> = {
@@ -57,45 +51,40 @@ export class AIService {
       const regex = new RegExp(`\\b${wrong}\\b`, 'gi');
       corrected = corrected.replace(regex, right);
     });
+
     corrected = corrected.replace(/\bi\b/g, 'I');
-    corrected = corrected.replace(/(^|[.!?]\s+)([a-z])/g, (m,p1,p2)=>p1+p2.toUpperCase());
+    corrected = corrected.replace(/(^|[.!?]\s+)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
     if (corrected && !/[.!?]$/.test(corrected.trim())) corrected += ".";
     return corrected;
   }
 
   private getModel(serviceType: string, hasImage: boolean): string {
     if (hasImage) return this.models.image;
-    switch(serviceType) {
-      case 'code': return this.models.code;
-      case 'creative': return this.models.creative;
-      case 'knowledge': return this.models.knowledge;
-      case 'general': return this.models.general;
-      default: return this.models.auto;
-    }
+    return this.models[serviceType as keyof typeof this.models] || this.models.auto;
   }
 
+  // Main function to send messages to OpenRouter AI
   async sendMessage(messages: AIMessage[], serviceType: string = 'auto'): Promise<AIResponse> {
     try {
       const lastMessage = messages[messages.length - 1];
       const hasImage = !!lastMessage.image;
       const isImageGeneration = /generate.*image|create.*image|make.*image|draw|picture|photo/i.test(lastMessage.content);
-
       const selectedModel = this.getModel(serviceType, hasImage);
 
-      // Image handling
+      // Handle image generation fallback (Pollinations)
       if (isImageGeneration && !hasImage) {
         const prompt = lastMessage.content.replace(/generate|create|make|draw/gi, '').trim();
         const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&seed=${Date.now()}&enhance=true`;
         return {
-          content: `I've generated an image for: "${prompt}"`,
+          content: `I've generated an image for: "${prompt}". Here's your custom AI-generated image!`,
           model: 'Pollinations AI',
           imageUrl
         };
       }
 
-      // Format messages for OpenAI client
-      const formattedMessages = [
-        { role: 'system', content: `You are PandaNexus, a helpful AI assistant.` },
+      // Prepare messages
+      const apiMessages = [
+        { role: 'system', content: "You are PandaNexus, an advanced AI assistant created by Shakeel. Provide accurate and helpful responses." },
         ...messages.slice(-5).map(msg => ({
           role: msg.role,
           content: msg.image ? [
@@ -105,60 +94,54 @@ export class AIService {
         }))
       ];
 
-      const response = await this.client.chat.completions.create({
-        model: selectedModel,
-        messages: formattedMessages,
-        temperature: serviceType === 'creative' ? 0.8 : serviceType === 'code' ? 0.3 : 0.7,
-        max_tokens: 2000,
-        top_p: 0.9,
-        frequency_penalty: 0.1,
-        presence_penalty: 0.1,
-        stream: false,
-        extra_headers: {
-          "HTTP-Referer": "https://pandanexus.dev",
-          "X-Title": "PandaNexus AI Platform"
-        }
+      // Fetch from OpenRouter
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://pandanexus.dev',
+          'X-Title': 'PandaNexus AI Platform'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: apiMessages,
+          temperature: serviceType === 'creative' ? 0.8 : serviceType === 'code' ? 0.3 : 0.7,
+          max_tokens: 2000,
+          top_p: 0.9,
+          frequency_penalty: 0.1,
+          presence_penalty: 0.1
+        })
       });
 
-      const content = response.choices?.[0]?.message?.content;
-      if (!content) throw new Error('No content received from API');
+      if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+      const data = await response.json();
 
-      return { content, model: selectedModel };
+      return {
+        content: data.choices?.[0]?.message?.content || lastMessage.content,
+        model: selectedModel,
+        imageUrl: lastMessage.image
+      };
     } catch (error) {
       console.error("AIService Error:", error);
-      const fallback: Record<string,string> = {
-        auto: "Hi! I'm PandaNexus AI assistant. How can I help?",
-        code: "Here's a simple code example: console.log('Hello PandaNexus');",
-        creative: "Let's create something amazing! What project are you working on?",
-        knowledge: "I can provide detailed knowledge and explanations on any topic.",
-        general: "Hello! I'm PandaNexus, your AI assistant. How can I assist you today?"
+      return {
+        content: "Hi! I'm PandaNexus. I am here to help you, but the AI service is currently unavailable.",
+        model: 'Offline'
       };
-      return { content: fallback[serviceType] || fallback.auto, model: 'PandaNexus Offline' };
     }
   }
 
+  // Spell check helper
   async spellCheck(text: string): Promise<string> {
     try {
-      const localCorrection = this.enhancedSpellCheck(text);
-      if (localCorrection !== text) return localCorrection;
-
-      const response = await this.client.chat.completions.create({
-        model: this.models.general,
-        messages: [
-          { role: 'system', content: 'Correct spelling, grammar, and punctuation. Return ONLY the corrected text.' },
-          { role: 'user', content: text }
-        ],
-        temperature: 0.1,
-        max_tokens: 500
-      });
-
-      return response.choices?.[0]?.message?.content || localCorrection;
+      const corrected = this.enhancedSpellCheck(text);
+      if (corrected !== text) return corrected;
+      return text;
     } catch (error) {
       console.error("Spell check error:", error);
-      return this.enhancedSpellCheck(text);
+      return text;
     }
   }
 }
 
-// Instantiate with your API key
-export const aiService = new AIService("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");
+export const aiService = new AIService();
