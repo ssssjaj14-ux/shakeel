@@ -221,6 +221,36 @@
   input, textarea, select {
     font-size: 16px;
   }
+  
+  /* Enhanced mobile chat layout */
+  .chat-container {
+    padding: 0.5rem !important;
+  }
+  
+  .chat-input {
+    font-size: 16px !important;
+    padding: 0.75rem !important;
+  }
+  
+  /* Mobile service selector */
+  .service-selector {
+    gap: 0.5rem !important;
+  }
+  
+  .service-button {
+    min-width: auto !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Mobile header optimization */
+  .mobile-header {
+    padding: 0.75rem !important;
+  }
+  
+  .mobile-title {
+    font-size: 1.125rem !important;
+  }
 }
 
 @media (max-width: 768px) {
@@ -247,7 +277,7 @@
 
 /* Enhanced scrollbar - mobile friendly */
 ::-webkit-scrollbar {
-  width: 3px;
+  width: 2px;
 }
 
 @media (min-width: 768px) {

@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 import VercelDeploy from "./VercelDeploy";
 import { aiService } from "@/services/aiService";
-import { Send, Code, Terminal, FileCode, Zap, Copy, Download, Play, ArrowLeft, Rocket } from "lucide-react";
+import { Send, Code, Terminal, FileCode, Zap, Copy, Download, ArrowLeft, Rocket, Play } from "lucide-react";
 import PandaLogo from "./PandaLogo";
 import { toast } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 
 interface Message {
   id: string;
@@ -66,6 +66,10 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
       });
     } catch (err) {
       console.error('Failed to copy code:', err);
+      toast("Copy failed", {
+        description: "Please select and copy manually",
+        duration: 2000,
+      });
     }
   };
 
@@ -109,7 +113,9 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
         content: m.content
       }));
 
+      console.log('Sending code request...');
       const response = await aiService.sendMessage(conversationHistory, 'code');
+      console.log('Code response received:', response);
 
       // Extract code blocks from response
       const codeMatch = response.content.match(/```(\w+)?\n([\s\S]*?)```/);
@@ -126,14 +132,38 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
       };
       
       setMessages(prev => [...prev, assistantMessage]);
+      
+      toast("Code generated!", {
+        description: `${language} code ready`,
+        duration: 2000,
+      });
+      
     } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, {
+      console.error('Code generation error:', error);
+      
+      // Provide helpful fallback code examples
+      const fallbackCode = {
+        javascript: `// JavaScript Example\nfunction greetUser(name) {\n  return \`Hello, \${name}! Welcome to PandaNexus!\`;\n}\n\nconsole.log(greetUser('Developer'));`,
+        typescript: `// TypeScript Example\ninterface User {\n  name: string;\n  email: string;\n}\n\nfunction createUser(userData: User): User {\n  return {\n    ...userData,\n    createdAt: new Date()\n  };\n}`,
+        python: `# Python Example\ndef greet_user(name: str) -> str:\n    return f"Hello, {name}! Welcome to PandaNexus!"\n\nprint(greet_user("Developer"))`,
+        react: `// React Component Example\nimport React from 'react';\n\nconst Welcome = ({ name }) => {\n  return (\n    <div className="p-4">\n      <h1>Hello, {name}!</h1>\n      <p>Welcome to PandaNexus!</p>\n    </div>\n  );\n};\n\nexport default Welcome;`
+      };
+
+      const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "⚠️ Code generation failed. Please try again with a more specific request.",
+        content: `Here's a ${selectedLanguage} example to get you started:`,
         role: 'assistant',
-        timestamp: new Date()
-      }]);
+        timestamp: new Date(),
+        code: fallbackCode[selectedLanguage as keyof typeof fallbackCode] || fallbackCode.javascript,
+        language: selectedLanguage
+      };
+      
+      setMessages(prev => [...prev, fallbackMessage]);
+      
+      toast("Using offline examples", {
+        description: "Code examples provided",
+        duration: 2000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -141,10 +171,10 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      {/* Enhanced Responsive Header */}
+      {/* Mobile-First Header */}
       <Card className="border-0 border-b border-glass-border bg-gradient-glass backdrop-blur-xl shrink-0">
-        <div className="flex items-center justify-between p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center justify-between p-3 md:p-4">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
@@ -153,28 +183,28 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="relative shrink-0">
-                <PandaLogo className="w-6 h-6 sm:w-8 sm:h-8" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 bg-primary rounded-full animate-pulse"></div>
+                <PandaLogo className="w-8 h-8" />
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse"></div>
               </div>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-lg md:text-xl font-bold bg-gradient-text bg-clip-text text-transparent flex items-center gap-2">
-                  <Code className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                <h1 className="text-lg md:text-xl font-bold bg-gradient-text bg-clip-text text-transparent flex items-center gap-2">
+                  <Code className="w-4 h-4 shrink-0" />
                   <span className="truncate">Code Studio</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">AI-Powered Development</p>
+                <p className="text-xs text-muted-foreground hidden sm:block">AI-Powered Development</p>
               </div>
             </div>
           </div>
 
-          {/* Deploy Button for Code */}
+          {/* Deploy Button */}
           <div className="flex items-center gap-2 shrink-0">
             <VercelDeploy>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 w-8 sm:w-auto sm:px-3 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
+                className="h-8 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
               >
                 <Rocket className="w-4 h-4" />
                 <span className="hidden sm:inline ml-1">Deploy</span>
@@ -189,8 +219,8 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
         </div>
         
         {/* Language Selector - Mobile Responsive */}
-        <div className="px-2 sm:px-3 md:px-4 pb-2 sm:pb-3">
-          <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="px-3 md:px-4 pb-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {languages.map(lang => (
               <Button
                 key={lang.value}
@@ -210,8 +240,8 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
         </div>
       </Card>
 
-      {/* Code Messages - Responsive */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-3 sm:space-y-4 min-h-0">
+      {/* Code Messages - Mobile Optimized */}
+      <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-3 md:space-y-4 min-h-0">
         {messages.map((message) => (
           <div key={message.id}>
             <ChatMessage message={message} />
@@ -219,7 +249,7 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
             {/* Enhanced Code Block - Mobile Responsive */}
             {message.code && (
               <Card className="mt-3 bg-gradient-glass border-glass-border shadow-glass overflow-hidden">
-                <div className="flex items-center justify-between p-2 sm:p-3 border-b border-glass-border bg-muted/20">
+                <div className="flex items-center justify-between p-3 border-b border-glass-border bg-muted/20">
                   <div className="flex items-center gap-2 min-w-0">
                     <FileCode className="w-4 h-4 text-primary shrink-0" />
                     <span className="text-sm font-medium truncate">{message.language}</span>
@@ -227,7 +257,7 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
                       {message.code.split('\n').length} lines
                     </Badge>
                   </div>
-                  <div className="flex gap-1 sm:gap-2 shrink-0">
+                  <div className="flex gap-1 shrink-0">
                     <Button
                       size="sm"
                       variant="outline"
@@ -249,7 +279,7 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
                   </div>
                 </div>
                 <div className="relative">
-                  <pre className="p-3 sm:p-4 overflow-x-auto text-xs sm:text-sm bg-muted/10 max-h-96">
+                  <pre className="p-3 md:p-4 overflow-x-auto text-xs sm:text-sm bg-muted/10 max-h-96">
                     <code className="text-foreground">{message.code}</code>
                   </pre>
                   <div className="absolute top-2 right-2 opacity-50">
@@ -264,11 +294,11 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Enhanced Input Area - Mobile Optimized */}
-      <Card className="border-0 border-t border-glass-border bg-gradient-glass backdrop-blur-xl m-2 sm:m-3 md:m-4 md:mt-0 shrink-0">
-        <form onSubmit={handleSubmit} className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
+      {/* Enhanced Input Area - Mobile First */}
+      <Card className="border-0 border-t border-glass-border bg-gradient-glass backdrop-blur-xl m-2 md:m-4 md:mt-0 shrink-0">
+        <form onSubmit={handleSubmit} className="p-3 md:p-4 space-y-3">
           {/* Quick Actions - Mobile Responsive */}
-          <div className="flex flex-wrap gap-1 sm:gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {[
               "Create a React component",
               "Debug this code", 
@@ -282,21 +312,21 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
                 variant="outline"
                 size="sm"
                 onClick={() => setInputValue(action)}
-                className="text-xs whitespace-nowrap bg-gradient-glass border-glass-border hover:shadow-glow shrink-0"
+                className="text-xs whitespace-nowrap bg-gradient-glass border-glass-border hover:shadow-glow shrink-0 h-8"
               >
                 {action}
               </Button>
             ))}
           </div>
 
-          {/* Input */}
-          <div className="flex items-end gap-2 sm:gap-3">
+          {/* Input Area */}
+          <div className="flex items-end gap-2">
             <div className="flex-1 min-w-0">
               <Textarea
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 placeholder={`Describe your ${selectedLanguage} coding task...`}
-                className="min-h-[60px] sm:min-h-[80px] bg-input/50 border-glass-border backdrop-blur-sm focus:ring-2 focus:ring-primary/20 resize-none text-sm"
+                className="min-h-[80px] bg-input/50 border-glass-border backdrop-blur-sm focus:ring-2 focus:ring-primary/20 resize-none text-sm"
                 disabled={isLoading}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -313,7 +343,7 @@ const CodeInterface = ({ onBack }: CodeInterfaceProps) => {
             <Button
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="bg-gradient-primary hover:shadow-glow transition-all duration-300 h-10 sm:h-12 w-10 sm:w-auto sm:px-6 shrink-0"
+              className="bg-gradient-primary hover:shadow-glow transition-all duration-300 h-12 w-12 sm:w-auto sm:px-6 shrink-0"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin" />

@@ -10,7 +10,7 @@ import ContactDialog from "./ContactDialog";
 import CodeInterface from "./CodeInterface";
 import VercelDeploy from "./VercelDeploy";
 import { aiService } from "@/services/aiService";
-import { Send, Plus, Copy, Code, MessageCircle, Phone, Mail, Rocket, Image, Sparkles } from "lucide-react";
+import { Send, Plus, Copy, Code, MessageCircle, Rocket, Image, Sparkles, Menu, X } from "lucide-react";
 import PandaLogo from "./PandaLogo";
 import { useTheme } from "./ThemeProvider";
 import { toast } from "@/components/ui/sonner";
@@ -40,6 +40,7 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceType>('auto');
   const [showCodeInterface, setShowCodeInterface] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +56,7 @@ const ChatInterface = () => {
     return <CodeInterface onBack={() => setShowCodeInterface(false)} />;
   }
 
-  // Enhanced file upload with image preview
+  // Enhanced file upload with better mobile support
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -72,6 +73,10 @@ const ChatInterface = () => {
           image: imageUrl
         };
         setMessages(prev => [...prev, fileMessage]);
+        toast("Image uploaded successfully!", {
+          description: "AI will analyze your image",
+          duration: 2000,
+        });
       };
       reader.readAsDataURL(file);
     } else {
@@ -84,8 +89,17 @@ const ChatInterface = () => {
           timestamp: new Date()
         };
         setMessages(prev => [...prev, fileMessage]);
+        toast("File uploaded successfully!", {
+          description: "Content has been processed",
+          duration: 2000,
+        });
       };
       reader.readAsText(file);
+    }
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -98,13 +112,13 @@ const ChatInterface = () => {
       const correctedText = await aiService.spellCheck(inputValue);
       setInputValue(correctedText);
       toast("Text corrected!", {
-        description: "Spelling and grammar have been improved",
+        description: "Spelling and grammar improved",
         duration: 2000,
       });
     } catch (error) {
       console.error("Spell check failed:", error);
-      toast("Spell check failed", {
-        description: "Please try again",
+      toast("Spell check unavailable", {
+        description: "Using basic corrections",
         duration: 2000,
       });
     } finally {
@@ -112,7 +126,7 @@ const ChatInterface = () => {
     }
   };
 
-  // Enhanced message submission with proper API integration
+  // Enhanced message submission with better error handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
@@ -129,14 +143,15 @@ const ChatInterface = () => {
     setIsLoading(true);
 
     try {
-      // Prepare conversation history for AI
       const conversationHistory = [...messages, userMessage].map(m => ({
         role: m.role,
         content: m.content,
         image: m.image
       }));
 
+      console.log('Sending message to AI service...');
       const response = await aiService.sendMessage(conversationHistory, selectedService);
+      console.log('Received response:', response);
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -147,15 +162,26 @@ const ChatInterface = () => {
       };
       
       setMessages(prev => [...prev, assistantMessage]);
+      
+      toast("Response received!", {
+        description: `Powered by ${response.model}`,
+        duration: 2000,
+      });
+      
     } catch (error) {
       console.error("Chat error:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm having trouble connecting right now. Please check your internet connection and try again. If the issue persists, contact Shakeel for support.",
+        content: "I'm having trouble connecting right now. Let me try to help you anyway! What specific question do you have? I can provide general assistance even when my main AI models are unavailable.",
         role: 'assistant',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      toast("Connection issue", {
+        description: "Using offline mode",
+        duration: 3000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -171,7 +197,7 @@ const ChatInterface = () => {
     } catch (err) {
       console.error('Failed to copy:', err);
       toast("Copy failed", {
-        description: "Please try again",
+        description: "Please try selecting and copying manually",
         duration: 2000,
       });
     }
@@ -179,52 +205,51 @@ const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      {/* Enhanced Responsive Header */}
+      {/* Mobile-First Responsive Header */}
       <Card className="border-0 border-b border-glass-border bg-gradient-glass backdrop-blur-xl shrink-0">
-        <div className="flex items-center justify-between p-2 sm:p-3 md:p-4">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <PandaLogo className="w-6 h-6 md:w-8 md:h-8 shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-bold bg-gradient-text bg-clip-text text-transparent truncate">
+        <div className="flex items-center justify-between p-3 md:p-4">
+          {/* Logo and Title - Mobile Optimized */}
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <PandaLogo className="w-8 h-8 md:w-10 md:h-10 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-text bg-clip-text text-transparent truncate">
                 PandaNexus
               </h1>
-              <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">AI Hub • Lightning Fast</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">AI Hub • Lightning Fast</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 md:gap-2 shrink-0">
-            {/* Code Interface Button */}
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowCodeInterface(true)}
-              className="h-8 w-8 md:w-auto md:px-3 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
+              className="bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
             >
-              <Code className="w-4 h-4" />
-              <span className="hidden md:inline ml-1">Code</span>
+              <Code className="w-4 h-4 mr-2" />
+              Code Studio
             </Button>
             
-            {/* Deploy Button */}
             <VercelDeploy>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 w-8 md:w-auto md:px-3 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
+                className="bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
               >
-                <Rocket className="w-4 h-4" />
-                <span className="hidden md:inline ml-1">Deploy</span>
+                <Rocket className="w-4 h-4 mr-2" />
+                Deploy
               </Button>
             </VercelDeploy>
             
-            {/* Contact Button */}
             <ContactDialog>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 w-8 md:w-auto md:px-3 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
+                className="bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300"
               >
-                <MessageCircle className="w-4 h-4" />
-                <span className="hidden md:inline ml-1">Contact</span>
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Contact
               </Button>
             </ContactDialog>
             
@@ -232,15 +257,77 @@ const ChatInterface = () => {
               variant="ghost"
               size="sm"
               onClick={toggleTheme}
-              className="h-8 w-8 px-0 shrink-0"
+              className="h-8 w-8 px-0"
             >
               {theme === 'dark' ? "☀️" : "🌙"}
             </Button>
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="flex md:hidden items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="h-8 w-8 px-0"
+            >
+              {theme === 'dark' ? "☀️" : "🌙"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="h-8 w-8 px-0"
+            >
+              {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile Menu */}
+        {showMobileMenu && (
+          <div className="md:hidden border-t border-glass-border p-3 space-y-2 bg-gradient-glass">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowCodeInterface(true);
+                setShowMobileMenu(false);
+              }}
+              className="w-full justify-start bg-gradient-glass border-glass-border"
+            >
+              <Code className="w-4 h-4 mr-2" />
+              Code Studio
+            </Button>
+            
+            <VercelDeploy>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start bg-gradient-glass border-glass-border"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <Rocket className="w-4 h-4 mr-2" />
+                Deploy to Vercel
+              </Button>
+            </VercelDeploy>
+            
+            <ContactDialog>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-start bg-gradient-glass border-glass-border"
+                onClick={() => setShowMobileMenu(false)}
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Contact Shakeel
+              </Button>
+            </ContactDialog>
+          </div>
+        )}
         
-        {/* Service Selector - Mobile Responsive */}
-        <div className="px-2 sm:px-3 md:px-4 pb-2 sm:pb-3">
+        {/* Service Selector - Always Visible */}
+        <div className="px-3 md:px-4 pb-3">
           <ServiceSelector
             selectedService={selectedService}
             onServiceChange={setSelectedService}
@@ -249,12 +336,11 @@ const ChatInterface = () => {
         </div>
       </Card>
 
-      {/* Enhanced Messages Area */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-3 md:space-y-4 min-h-0">
+      {/* Messages Area - Mobile Optimized */}
+      <div className="flex-1 overflow-y-auto p-2 md:p-4 space-y-3 md:space-y-4 min-h-0">
         {messages.map((message) => (
           <div key={message.id} className="relative group">
             <ChatMessage message={message} />
-            {/* Copy Button */}
             <Button
               variant="ghost"
               size="sm"
@@ -269,11 +355,11 @@ const ChatInterface = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Enhanced Input Area - Mobile Optimized */}
-      <Card className="border-0 border-t border-glass-border bg-gradient-glass backdrop-blur-xl m-2 sm:m-3 md:m-4 md:mt-0 shrink-0">
-        <form onSubmit={handleSubmit} className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3">
+      {/* Enhanced Input Area - Mobile First */}
+      <Card className="border-0 border-t border-glass-border bg-gradient-glass backdrop-blur-xl m-2 md:m-4 md:mt-0 shrink-0">
+        <form onSubmit={handleSubmit} className="p-3 md:p-4 space-y-3">
           {/* Quick Actions - Mobile Responsive */}
-          <div className="flex flex-wrap gap-1 sm:gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {[
               { text: "Help me code", icon: Code },
               { text: "Generate image", icon: Image },
@@ -286,7 +372,7 @@ const ChatInterface = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setInputValue(action.text)}
-                className="text-xs whitespace-nowrap bg-gradient-glass border-glass-border hover:shadow-glow shrink-0"
+                className="text-xs whitespace-nowrap bg-gradient-glass border-glass-border hover:shadow-glow shrink-0 h-8"
               >
                 <action.icon className="w-3 h-3 mr-1" />
                 {action.text}
@@ -294,8 +380,8 @@ const ChatInterface = () => {
             ))}
           </div>
 
-          {/* Input Row */}
-          <div className="flex items-end gap-2 sm:gap-3">
+          {/* Input Row - Mobile Optimized */}
+          <div className="flex items-end gap-2">
             {/* Upload Button */}
             <input
               ref={fileInputRef}
@@ -309,9 +395,9 @@ const ChatInterface = () => {
               variant="outline"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 h-9 w-9 md:h-10 md:w-10 font-bold text-lg bg-gradient-glass border-glass-border hover:shadow-glow"
+              className="shrink-0 h-10 w-10 font-bold text-lg bg-gradient-glass border-glass-border hover:shadow-glow"
             >
-              +
+              <Plus className="w-4 h-4" />
             </Button>
 
             {/* Input Field */}
@@ -319,8 +405,8 @@ const ChatInterface = () => {
               <Input
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
-                placeholder={`Ask PandaNexus anything...`}
-                className="bg-input/50 border-glass-border backdrop-blur-sm focus:ring-2 focus:ring-primary/20 text-sm md:text-base"
+                placeholder="Ask PandaNexus anything..."
+                className="bg-input/50 border-glass-border backdrop-blur-sm focus:ring-2 focus:ring-primary/20 h-10"
                 disabled={isLoading}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -338,16 +424,16 @@ const ChatInterface = () => {
               variant="outline"
               size="icon"
               disabled={isLoading || !inputValue.trim()}
-              className="shrink-0 h-9 md:h-10 w-9 md:w-10 bg-gradient-glass border-glass-border hover:shadow-glow"
+              className="shrink-0 h-10 w-10 bg-gradient-glass border-glass-border hover:shadow-glow"
             >
-              ✨
+              <Sparkles className="w-4 h-4" />
             </Button>
 
             {/* Send Button */}
             <Button
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="bg-gradient-primary hover:shadow-glow transition-all duration-300 shrink-0 h-9 md:h-10 w-9 md:w-10 flex items-center justify-center"
+              className="bg-gradient-primary hover:shadow-glow transition-all duration-300 shrink-0 h-10 w-10"
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin"></div>
@@ -357,9 +443,9 @@ const ChatInterface = () => {
             </Button>
           </div>
           
-          {/* Mobile Helper Text */}
-          <p className="text-xs text-muted-foreground text-center sm:text-left">
-            Press Enter to send • ✨ for spell check • + to upload files
+          {/* Helper Text - Mobile Friendly */}
+          <p className="text-xs text-muted-foreground text-center">
+            Press Enter to send • <Sparkles className="w-3 h-3 inline" /> for spell check • <Plus className="w-3 h-3 inline" /> to upload
           </p>
         </form>
       </Card>

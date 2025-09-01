@@ -11,50 +11,31 @@ interface ServiceSelectorProps {
 }
 
 const serviceOptions = [
-  { value: 'auto', label: 'Auto', icon: '🤖', description: 'Smart routing' },
+  { value: 'auto', label: 'Auto', icon: '🤖', description: 'Smart AI routing' },
   { value: 'code', label: 'Code', icon: '💻', description: 'Programming help' },
   { value: 'creative', label: 'Creative', icon: '🎨', description: 'Writing & ideas' },
   { value: 'knowledge', label: 'Knowledge', icon: '📚', description: 'Research & facts' },
-  { value: 'general', label: 'General', icon: '💬', description: 'Chat & support' },
+  { value: 'general', label: 'Chat', icon: '💬', description: 'General chat' },
 ] as const;
 
 export function ServiceSelector({ selectedService, onServiceChange, className }: ServiceSelectorProps) {
   return (
     <div className={cn("w-full", className)}>
-      {/* Mobile: Horizontal scroll */}
-      <div className="flex md:hidden gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      {/* Mobile: Horizontal scroll with better spacing */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {serviceOptions.map((service) => (
           <Button
             key={service.value}
             variant={selectedService === service.value ? 'default' : 'outline'}
             size="sm"
             className={cn(
-              "shrink-0 h-8 px-3 text-xs bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300",
-              selectedService === service.value && "bg-gradient-primary text-primary-foreground"
+              "shrink-0 h-9 px-4 text-sm bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300",
+              selectedService === service.value && "bg-gradient-primary text-primary-foreground shadow-glow"
             )}
             onClick={() => onServiceChange(service.value as ServiceType)}
           >
-            <span className="mr-1">{service.icon}</span>
+            <span className="mr-2">{service.icon}</span>
             {service.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Desktop: Grid layout */}
-      <div className="hidden md:grid grid-cols-5 gap-2 p-1 bg-gradient-glass rounded-lg border border-glass-border">
-        {serviceOptions.map((service) => (
-          <Button
-            key={service.value}
-            variant={selectedService === service.value ? 'default' : 'outline'}
-            size="sm"
-            className={cn(
-              "h-12 flex flex-col items-center justify-center gap-1 bg-gradient-glass border-glass-border hover:shadow-glow transition-all duration-300",
-              selectedService === service.value && "bg-gradient-primary text-primary-foreground"
-            )}
-            onClick={() => onServiceChange(service.value as ServiceType)}
-          >
-            <span className="text-lg">{service.icon}</span>
-            <span className="text-xs font-medium">{service.label}</span>
           </Button>
         ))}
       </div>
