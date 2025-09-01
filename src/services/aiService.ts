@@ -13,11 +13,11 @@ export interface AIResponse {
 }
 
 export class AIService {
-  private apiKey = "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";
+  private apiKey = "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";
   private baseUrl = "https://openrouter.ai/api/v1";
 
   private models = {
-    auto: "meta-llama/llama-3.2-3b-instruct:free",
+    auto: "deepseek/deepseek-chat-v3.1:free",
     code: "qwen/qwen3-coder:free",
     creative: "deepseek/deepseek-chat-v3.1:free",
     knowledge: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -41,9 +41,9 @@ export class AIService {
       'intergrate': 'integrate', 'knowlege': 'knowledge', 'maintainance': 'maintenance',
       'occassion': 'occasion', 'persue': 'pursue', 'priviledge': 'privilege',
       'recomend': 'recommend', 'refered': 'referred', 'relevent': 'relevant',
-      'responsable': 'responsible', 'succesful': 'successful',
-      'tommorow': 'tomorrow', 'truely': 'truly', 'untill': 'until',
-      'usefull': 'useful', 'wierd': 'weird', 'writting': 'writing'
+      'responsable': 'responsible', 'succesful': 'successful', 'tommorow': 'tomorrow',
+      'truely': 'truly', 'untill': 'until', 'usefull': 'useful', 'wierd': 'weird',
+      'writting': 'writing'
     };
 
     let corrected = text;
@@ -53,7 +53,7 @@ export class AIService {
     });
 
     corrected = corrected.replace(/\bi\b/g, 'I');
-    corrected = corrected.replace(/(^|[.!?]\s+)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+    corrected = corrected.replace(/(^|[.!?]\s+)([a-z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
     if (corrected && !/[.!?]$/.test(corrected.trim())) corrected += ".";
     return corrected;
   }
@@ -63,7 +63,7 @@ export class AIService {
     return this.models[serviceType as keyof typeof this.models] || this.models.auto;
   }
 
-  // Main function to send messages to OpenRouter AI
+  // Main function to send messages
   async sendMessage(messages: AIMessage[], serviceType: string = 'auto'): Promise<AIResponse> {
     try {
       const lastMessage = messages[messages.length - 1];
@@ -71,20 +71,20 @@ export class AIService {
       const isImageGeneration = /generate.*image|create.*image|make.*image|draw|picture|photo/i.test(lastMessage.content);
       const selectedModel = this.getModel(serviceType, hasImage);
 
-      // Handle image generation fallback (Pollinations)
+      // Pollinations fallback for image generation
       if (isImageGeneration && !hasImage) {
         const prompt = lastMessage.content.replace(/generate|create|make|draw/gi, '').trim();
         const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&seed=${Date.now()}&enhance=true`;
         return {
-          content: `I've generated an image for: "${prompt}". Here's your custom AI-generated image!`,
+          content: `I've generated an image for: "${prompt}". Here's your AI-generated image!`,
           model: 'Pollinations AI',
           imageUrl
         };
       }
 
-      // Prepare messages
+      // Prepare API messages
       const apiMessages = [
-        { role: 'system', content: "You are PandaNexus, an advanced AI assistant created by Shakeel. Provide accurate and helpful responses." },
+        { role: 'system', content: "You are PandaNexus, an advanced AI assistant created by Shakeel. Provide accurate, helpful, and friendly responses." },
         ...messages.slice(-5).map(msg => ({
           role: msg.role,
           content: msg.image ? [
@@ -94,7 +94,7 @@ export class AIService {
         }))
       ];
 
-      // Fetch from OpenRouter
+      // Fetch OpenRouter API
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -135,8 +135,7 @@ export class AIService {
   async spellCheck(text: string): Promise<string> {
     try {
       const corrected = this.enhancedSpellCheck(text);
-      if (corrected !== text) return corrected;
-      return text;
+      return corrected !== text ? corrected : text;
     } catch (error) {
       console.error("Spell check error:", error);
       return text;
